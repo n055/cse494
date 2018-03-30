@@ -187,9 +187,9 @@ BOOL SetupMagnifier(HINSTANCE hinst)
 {
     // Set bounds of host window according to screen size.
     hostWindowRect.top = 0;
-    hostWindowRect.bottom = GetSystemMetrics(SM_CYSCREEN) / 4;  // top quarter of screen
+    hostWindowRect.bottom = GetSystemMetrics(SM_CYSCREEN) / 2;  // top quarter of screen
     hostWindowRect.left = 0;
-    hostWindowRect.right = GetSystemMetrics(SM_CXSCREEN);
+    hostWindowRect.right = GetSystemMetrics(SM_CXSCREEN) / 2;
 
     // Create the host window.
     RegisterHostWindowClass(hinst);
@@ -255,8 +255,10 @@ void CALLBACK UpdateMagWindow(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR /*idEvent*/
     int width = (int)((magWindowRect.right - magWindowRect.left) / MAGFACTOR);
     int height = (int)((magWindowRect.bottom - magWindowRect.top) / MAGFACTOR);
     RECT sourceRect;
-    sourceRect.left = mousePoint.x - width / 2;
-    sourceRect.top = mousePoint.y -  height / 2;
+	RECT windowRelativeRect;
+	GetWindowRect(hwndHost, &windowRelativeRect);
+	sourceRect.left = windowRelativeRect.left + 100; // mousePoint.x - width / 2;
+    sourceRect.top = windowRelativeRect.left + 100; // mousePoint.y -  height / 2;
 
     // Don't scroll outside desktop area.
     if (sourceRect.left < 0)
