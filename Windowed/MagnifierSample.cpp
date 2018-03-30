@@ -48,7 +48,7 @@
 
 // For simplicity, the sample uses a constant magnification factor.
 #define MAGFACTOR  2.0f
-#define RESTOREDWINDOWSTYLES WS_SIZEBOX | WS_SYSMENU | WS_CLIPCHILDREN | WS_CAPTION | WS_MAXIMIZEBOX
+#define RESTOREDWINDOWSTYLES WS_SIZEBOX | WS_SYSMENU | WS_CLIPCHILDREN | WS_CAPTION // | WS_MAXIMIZEBOX
 
 // Global variables and strings.
 HINSTANCE           hInst;
@@ -254,31 +254,38 @@ void CALLBACK UpdateMagWindow(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR /*idEvent*/
 
     int width = (int)((magWindowRect.right - magWindowRect.left) / MAGFACTOR);
     int height = (int)((magWindowRect.bottom - magWindowRect.top) / MAGFACTOR);
+
+	// Screen metrics
+	long screenY = GetSystemMetrics(SM_CYSCREEN);
+	long screenX = GetSystemMetrics(SM_CXSCREEN);
+
     RECT sourceRect;
-	RECT windowRelativeRect;
-	GetWindowRect(hwndHost, &windowRelativeRect);
-	sourceRect.left = windowRelativeRect.left + 100; // mousePoint.x - width / 2;
-    sourceRect.top = windowRelativeRect.left + 100; // mousePoint.y -  height / 2;
+	RECT windowRect;
+	GetWindowRect(hwndHost, &windowRect);
+	sourceRect.left = (long) (10 + windowRect.left + (width) * (windowRect.left) / (screenX - MAGFACTOR * width));
+	// ^ original: mousePoint.x - width / 2;
+    sourceRect.top = (long) (windowRect.top + (height) * (windowRect.top) / (screenY - MAGFACTOR * height));
+	// ^ original: mousePoint.y -  height / 2;
 
     // Don't scroll outside desktop area.
-    if (sourceRect.left < 0)
+ /*   if (sourceRect.left < 0)
     {
         sourceRect.left = 0;
     }
     if (sourceRect.left > GetSystemMetrics(SM_CXSCREEN) - width)
     {
         sourceRect.left = GetSystemMetrics(SM_CXSCREEN) - width;
-    }
+    }*/
     sourceRect.right = sourceRect.left + width;
 
-    if (sourceRect.top < 0)
+    /*if (sourceRect.top < 0)
     {
         sourceRect.top = 0;
     }
     if (sourceRect.top > GetSystemMetrics(SM_CYSCREEN) - height)
     {
         sourceRect.top = GetSystemMetrics(SM_CYSCREEN) - height;
-    }
+    }*/
     sourceRect.bottom = sourceRect.top + height;
 
     // Set the source rectangle for the magnifier control.
