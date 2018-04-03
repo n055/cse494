@@ -53,7 +53,8 @@
 // Global variables and strings.
 HINSTANCE           hInst;
 const TCHAR         WindowClassName[]= TEXT("MagnifierWindow");
-const TCHAR         WindowTitle[]= TEXT("Screen Magnifier Sample");
+const TCHAR         WindowTitle[]= TEXT("Change window position: ALT-TAB to window, press ESC");
+const TCHAR			WindowTitleMoveable[] = TEXT("Lock window position: click window, press ESC");
 const UINT          timerInterval = 16; // close to the refresh rate @60hz
 HWND                hwndMag;
 HWND                hwndHost;
@@ -65,9 +66,9 @@ ATOM                RegisterHostWindowClass(HINSTANCE hInstance);
 BOOL                SetupMagnifier(HINSTANCE hinst);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 void CALLBACK       UpdateMagWindow(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
-void                GoFullScreen();
-void                GoPartialScreen();
-BOOL                isFullScreen = FALSE;
+//void                GoFullScreen();
+//void                GoPartialScreen();
+BOOL                isMouseTransparent = FALSE;
 
 //
 // FUNCTION: WinMain()
@@ -117,20 +118,31 @@ LRESULT CALLBACK HostWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 {
     switch (message) 
     {
+	case WM_LBUTTONDOWN:
+		// printf("Mouse click\n");
+		SetForegroundWindow(hWnd);
+		break;
+
     case WM_KEYDOWN:
         if (wParam == VK_ESCAPE)
         {
-            if (isFullScreen) 
+            if (isMouseTransparent) 
             {
-                GoPartialScreen();
-            }
+				SetWindowLongPtr(hWnd, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_LAYERED);
+				SetWindowText(hWnd, WindowTitleMoveable);
+			}
+			else {
+				SetWindowLongPtr(hWnd, GWL_EXSTYLE, WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_LAYERED);
+				SetWindowText(hWnd, WindowTitle);
+			}
+			isMouseTransparent = !isMouseTransparent;
         }
         break;
 
     case WM_SYSCOMMAND:
         if (GET_SC_WPARAM(wParam) == SC_MAXIMIZE)
         {
-            GoFullScreen();
+            // GoFullScreen();
         }
         else
         {
@@ -193,7 +205,7 @@ BOOL SetupMagnifier(HINSTANCE hinst)
 
     // Create the host window.
     RegisterHostWindowClass(hinst);
-    hwndHost = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED, 
+    hwndHost = CreateWindowEx(WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_LAYERED,
         WindowClassName, WindowTitle, 
         RESTOREDWINDOWSTYLES,
         0, 0, hostWindowRect.right, hostWindowRect.bottom, NULL, NULL, hInst, NULL);
@@ -305,7 +317,7 @@ void CALLBACK UpdateMagWindow(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR /*idEvent*/
 //
 // PURPOSE: Makes the host window full-screen by placing non-client elements outside the display.
 //
-void GoFullScreen()
+/*void GoFullScreen()
 {
     isFullScreen = TRUE;
     // The window must be styled as layered for proper rendering. 
@@ -333,14 +345,14 @@ void GoFullScreen()
 
     SetWindowPos(hwndHost, HWND_TOPMOST, xOrigin, yOrigin, xSpan, ySpan, 
         SWP_SHOWWINDOW | SWP_NOZORDER | SWP_NOACTIVATE);
-}
+}*/
 
 //
 // FUNCTION: GoPartialScreen()
 //
 // PURPOSE: Makes the host window resizable and focusable.
 //
-void GoPartialScreen()
+/*void GoPartialScreen()
 {
     isFullScreen = FALSE;
 
@@ -350,3 +362,4 @@ void GoPartialScreen()
         hostWindowRect.left, hostWindowRect.top, hostWindowRect.right, hostWindowRect.bottom, 
         SWP_SHOWWINDOW | SWP_NOZORDER | SWP_NOACTIVATE);
 }
+*/
