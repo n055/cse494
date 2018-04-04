@@ -1,7 +1,7 @@
 # Improved Magnification and Contrast Software for Windows for Low Vision Users
 ## Contributors:
 
-Karl Noss (@no55)
+Karl Noss (@n055)
 
 Abir Rahman (@arahma12)
 
