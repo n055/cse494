@@ -5,36 +5,14 @@
 * Description: Implements a simple control that magnifies the screen, using the 
 * Magnification API.
 *
-* The magnification window is quarter-screen by default but can be resized.
-* To make it full-screen, use the Maximize button or double-click the caption
-* bar. To return to partial-screen mode, click on the application icon in the 
-* taskbar and press ESC. 
+* Focus the window and press ESC to toggle between passing through clicks or repositioning window.
 *
-* In full-screen mode, all keystrokes and mouse clicks are passed through to the
-* underlying focused application. In partial-screen mode, the window can receive the 
-* focus. 
-*
-* Multiple monitors are not supported.
-*
+* Multiple monitors are not supported. // TODO test this?
 * 
 * Requirements: To compile, link to Magnification.lib. The sample must be run with 
 * elevated privileges.
 *
 * The sample is not designed for multimonitor setups.
-* 
-*  This file is part of the Microsoft WinfFX SDK Code Samples.
-* 
-*  Copyright (C) Microsoft Corporation.  All rights reserved.
-* 
-* This source code is intended only as a supplement to Microsoft
-* Development Tools and/or on-line documentation.  See these other
-* materials for detailed information regarding Microsoft code samples.
-* 
-* THIS CODE AND INFORMATION ARE PROVIDED AS IS WITHOUT WARRANTY OF ANY
-* KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-* IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
-* PARTICULAR PURPOSE.
-* 
 *************************************************************************************************/
 
 // Ensure that the following definition is in effect before winuser.h is included.
@@ -92,6 +70,15 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance,
     ShowWindow(hwndHost, nCmdShow);
     UpdateWindow(hwndHost);
 
+
+	// edit filters
+	/*CreateWindowEx(
+		0,
+		"editFilter",
+		"Edit Filter",
+
+	);*/
+
     // Create a timer to update the control.
     UINT_PTR timerId = SetTimer(hwndHost, 0, timerInterval, UpdateMagWindow);
 
@@ -139,16 +126,16 @@ LRESULT CALLBACK HostWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
         }
         break;
 
-    case WM_SYSCOMMAND:
-        if (GET_SC_WPARAM(wParam) == SC_MAXIMIZE)
-        {
-            // GoFullScreen();
-        }
-        else
-        {
-            return DefWindowProc(hWnd, message, wParam, lParam);
-        }
-        break;
+    //case WM_SYSCOMMAND:
+    //    if (GET_SC_WPARAM(wParam) == SC_MAXIMIZE)
+    //    {
+    //        // GoFullScreen();
+    //    }
+    //    else
+    //    {
+    //        return DefWindowProc(hWnd, message, wParam, lParam);
+    //    }
+    //    break;
 
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -239,13 +226,28 @@ BOOL SetupMagnifier(HINSTANCE hinst)
     if (ret)
     {
         MAGCOLOREFFECT magEffectInvert = 
-        {{ // MagEffectInvert
-            { -1.0f,  0.0f,  0.0f,  0.0f,  0.0f },
-            {  0.0f, -1.0f,  0.0f,  0.0f,  0.0f },
-            {  0.0f,  0.0f, -1.0f,  0.0f,  0.0f },
-            {  0.0f,  0.0f,  0.0f,  1.0f,  0.0f },
-            {  1.0f,  1.0f,  1.0f,  0.0f,  1.0f } 
-        }};
+    	{{ // MagEffectInvert
+			{ -1.0f, 0.0f, 0.0f, 0.0f, 0.0f },
+			{ 0.0f, -1.0f,  0.0f,  0.0f,  0.0f },
+			{ 0.0f,  0.0f, -1.0f,  0.0f,  0.0f },
+			{ 0.0f,  0.0f,  0.0f,  1.0f,  0.0f },
+			{ 1.0f,  1.0f,  1.0f,  0.0f,  1.0f }
+		}};
+		//{{ // Normal
+		//	{ 1.0f, 0.0f,  0.0f,  0.0f,  0.0f },
+		//	{ 0.0f, 1.0f,  0.0f,  0.0f,  0.0f },
+		//	{ 0.0f,  0.0f, 1.0f,  0.0f,  0.0f },
+		//	{ 0.0f,  0.0f,  0.0f,  1.0f,  0.0f },
+		//	{ 0.0f,  0.0f,  0.0f,  0.0f,  0.0f }
+		//}};
+		/*{{ // Custom
+			{ 2.0f, 0.0f,  0.0f,  0.0f,  0.0f },
+			{ 0.0f, 2.0f,  0.0f,  0.0f,  0.0f },
+			{ 0.0f,  0.0f, 1.0f,  0.0f,  0.0f },
+			{ 0.0f,  0.0f,  0.0f,  1.0f,  0.0f },
+			{ -1.0f,  -1.0f,  0.0f,  0.0f,  0.0f }
+		}};*/
+		
 
         ret = MagSetColorEffect(hwndMag,&magEffectInvert);
     }

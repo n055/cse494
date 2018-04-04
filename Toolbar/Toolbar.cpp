@@ -2,6 +2,10 @@
 #include <commctrl.h>
 #pragma comment(lib, "comctl32.lib")
 
+/*
+Code derived from example at https://msdn.microsoft.com/en-us/library/windows/desktop/hh298382(v=vs.85).aspx
+*/
+
 HIMAGELIST g_hImageList = NULL;
 HINSTANCE g_hInst;
 HWND hwnd;
