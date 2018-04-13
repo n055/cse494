@@ -106,7 +106,6 @@ LRESULT CALLBACK HostWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
     switch (message) 
     {
 	case WM_LBUTTONDOWN:
-		// printf("Mouse click\n");
 		SetForegroundWindow(hWnd);
 		break;
 
@@ -125,17 +124,6 @@ LRESULT CALLBACK HostWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 			isMouseTransparent = !isMouseTransparent;
         }
         break;
-
-    //case WM_SYSCOMMAND:
-    //    if (GET_SC_WPARAM(wParam) == SC_MAXIMIZE)
-    //    {
-    //        // GoFullScreen();
-    //    }
-    //    else
-    //    {
-    //        return DefWindowProc(hWnd, message, wParam, lParam);
-    //    }
-    //    break;
 
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -281,25 +269,8 @@ void CALLBACK UpdateMagWindow(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR /*idEvent*/
     sourceRect.top = (long) (windowRect.top + (height) * (windowRect.top) / (screenY - MAGFACTOR * height));
 	// ^ original: mousePoint.y -  height / 2;
 
-    // Don't scroll outside desktop area.
- /*   if (sourceRect.left < 0)
-    {
-        sourceRect.left = 0;
-    }
-    if (sourceRect.left > GetSystemMetrics(SM_CXSCREEN) - width)
-    {
-        sourceRect.left = GetSystemMetrics(SM_CXSCREEN) - width;
-    }*/
-    sourceRect.right = sourceRect.left + width;
 
-    /*if (sourceRect.top < 0)
-    {
-        sourceRect.top = 0;
-    }
-    if (sourceRect.top > GetSystemMetrics(SM_CYSCREEN) - height)
-    {
-        sourceRect.top = GetSystemMetrics(SM_CYSCREEN) - height;
-    }*/
+    sourceRect.right = sourceRect.left + width;
     sourceRect.bottom = sourceRect.top + height;
 
     // Set the source rectangle for the magnifier control.
@@ -312,56 +283,3 @@ void CALLBACK UpdateMagWindow(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR /*idEvent*/
     // Force redraw.
     InvalidateRect(hwndMag, NULL, TRUE);
 }
-
-
-//
-// FUNCTION: GoFullScreen()
-//
-// PURPOSE: Makes the host window full-screen by placing non-client elements outside the display.
-//
-/*void GoFullScreen()
-{
-    isFullScreen = TRUE;
-    // The window must be styled as layered for proper rendering. 
-    // It is styled as transparent so that it does not capture mouse clicks.
-    SetWindowLong(hwndHost, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_LAYERED | WS_EX_TRANSPARENT);
-    // Give the window a system menu so it can be closed on the taskbar.
-    SetWindowLong(hwndHost, GWL_STYLE,  WS_CAPTION | WS_SYSMENU);
-
-    // Calculate the span of the display area.
-    HDC hDC = GetDC(NULL);
-    int xSpan = GetSystemMetrics(SM_CXSCREEN);
-    int ySpan = GetSystemMetrics(SM_CYSCREEN);
-    ReleaseDC(NULL, hDC);
-
-    // Calculate the size of system elements.
-    int xBorder = GetSystemMetrics(SM_CXFRAME);
-    int yCaption = GetSystemMetrics(SM_CYCAPTION);
-    int yBorder = GetSystemMetrics(SM_CYFRAME);
-
-    // Calculate the window origin and span for full-screen mode.
-    int xOrigin = -xBorder;
-    int yOrigin = -yBorder - yCaption;
-    xSpan += 2 * xBorder;
-    ySpan += 2 * yBorder + yCaption;
-
-    SetWindowPos(hwndHost, HWND_TOPMOST, xOrigin, yOrigin, xSpan, ySpan, 
-        SWP_SHOWWINDOW | SWP_NOZORDER | SWP_NOACTIVATE);
-}*/
-
-//
-// FUNCTION: GoPartialScreen()
-//
-// PURPOSE: Makes the host window resizable and focusable.
-//
-/*void GoPartialScreen()
-{
-    isFullScreen = FALSE;
-
-    SetWindowLong(hwndHost, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_LAYERED);
-    SetWindowLong(hwndHost, GWL_STYLE, RESTOREDWINDOWSTYLES);
-    SetWindowPos(hwndHost, HWND_TOPMOST, 
-        hostWindowRect.left, hostWindowRect.top, hostWindowRect.right, hostWindowRect.bottom, 
-        SWP_SHOWWINDOW | SWP_NOZORDER | SWP_NOACTIVATE);
-}
-*/
