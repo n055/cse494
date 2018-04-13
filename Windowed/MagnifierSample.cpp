@@ -31,11 +31,13 @@
 // Global variables and strings.
 HINSTANCE           hInst;
 const TCHAR         WindowClassName[]= TEXT("MagnifierWindow");
-const TCHAR         WindowTitle[]= TEXT("Change window position: ALT-TAB to window, press ESC");
-const TCHAR			WindowTitleMoveable[] = TEXT("Lock window position: click window, press ESC");
+const TCHAR         WindowTitle[]= TEXT("LOCKED. To unlock magnifier: ALT-TAB to window, press ESC 1 or 2 times");
+const TCHAR			WindowTitleMoveable[] = TEXT("UNLOCKED. To lock magnifier: click window, press ESC");
 const UINT          timerInterval = 16; // close to the refresh rate @60hz
 HWND                hwndMag;
 HWND                hwndHost;
+HINSTANCE			filterInst;
+HWND				hwndFilter;
 RECT                magWindowRect;
 RECT                hostWindowRect;
 
@@ -44,8 +46,7 @@ ATOM                RegisterHostWindowClass(HINSTANCE hInstance);
 BOOL                SetupMagnifier(HINSTANCE hinst);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 void CALLBACK       UpdateMagWindow(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
-//void                GoFullScreen();
-//void                GoPartialScreen();
+void SetupToolbarWindow(HINSTANCE hInstance);
 BOOL                isMouseTransparent = FALSE;
 
 //
@@ -71,13 +72,12 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance,
     UpdateWindow(hwndHost);
 
 
-	// edit filters
-	/*CreateWindowEx(
-		0,
-		"editFilter",
-		"Edit Filter",
-
-	);*/
+	// Toolbar
+	SetupToolbarWindow(filterInst);
+	
+	ShowWindow(hwndFilter, SW_SHOWDEFAULT);
+	UpdateWindow(hwndFilter);
+	// SetLayeredWindowAttributes(hwndFilter, 0, 255, LWA_ALPHA);
 
     // Create a timer to update the control.
     UINT_PTR timerId = SetTimer(hwndHost, 0, timerInterval, UpdateMagWindow);
@@ -95,6 +95,7 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance,
     MagUninitialize();
     return (int) msg.wParam;
 }
+
 
 //
 // FUNCTION: HostWndProc()
@@ -166,6 +167,40 @@ ATOM RegisterHostWindowClass(HINSTANCE hInstance)
 }
 
 //
+//  FUNCTION: SetupToolbarWindow()
+//
+//  PURPOSE: Registers the window class for the window that contains the toolbar.
+//
+void SetupToolbarWindow(HINSTANCE hInstance)
+{
+	WNDCLASSEX wcex = {};
+	wcex.cbSize = sizeof(WNDCLASSEX);
+	wcex.style = CS_HREDRAW | CS_VREDRAW;
+	wcex.lpfnWndProc = DefWindowProc;
+	wcex.hInstance = hInstance;
+	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wcex.hbrBackground = (HBRUSH)(1 + COLOR_BTNFACE);
+	wcex.lpszClassName = TEXT("toolbar");
+	RegisterClassEx(&wcex);
+
+	hwndFilter = CreateWindowEx(
+		0,
+		"toolbar",
+		"Toolbar",
+		RESTOREDWINDOWSTYLES,
+		0, 0, 120, GetSystemMetrics(SM_CYSCREEN),
+		NULL, NULL, hInstance, NULL
+	);
+
+	// Toolbar GUI controls
+	#define ID_RED_MULT	101
+
+	/*HWND hRedMult = */CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE | ES_NUMBER,
+		0, 0, 100, 28, hwndFilter, (HMENU)ID_RED_MULT, GetModuleHandle(NULL), NULL);
+	
+}
+
+//
 // FUNCTION: SetupMagnifier
 //
 // PURPOSE: Creates the windows and initializes magnification.
@@ -173,9 +208,9 @@ ATOM RegisterHostWindowClass(HINSTANCE hInstance)
 BOOL SetupMagnifier(HINSTANCE hinst)
 {
     // Set bounds of host window according to screen size.
-    hostWindowRect.top = 0;
-    hostWindowRect.bottom = GetSystemMetrics(SM_CYSCREEN) / 2;  // top quarter of screen
-    hostWindowRect.left = 0;
+    hostWindowRect.top = GetSystemMetrics(SM_CYSCREEN) / 3;
+    hostWindowRect.bottom = GetSystemMetrics(SM_CYSCREEN) / 2;  // quarter of screen
+    hostWindowRect.left = 100;
     hostWindowRect.right = GetSystemMetrics(SM_CXSCREEN) / 2;
 
     // Create the host window.
@@ -183,7 +218,7 @@ BOOL SetupMagnifier(HINSTANCE hinst)
     hwndHost = CreateWindowEx(WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_LAYERED,
         WindowClassName, WindowTitle, 
         RESTOREDWINDOWSTYLES,
-        0, 0, hostWindowRect.right, hostWindowRect.bottom, NULL, NULL, hInst, NULL);
+        hostWindowRect.left, hostWindowRect.top, hostWindowRect.right, hostWindowRect.bottom, NULL, NULL, hInst, NULL);
     if (!hwndHost)
     {
         return FALSE;
