@@ -22,15 +22,14 @@
 #define _WIN32_WINNT 0x0501    
 #endif
 
-// For simplicity, the sample uses a constant magnification factor.
-#define MAGFACTOR  2.0f
 #define RESTOREDWINDOWSTYLES WS_SIZEBOX | WS_SYSMENU | WS_CLIPCHILDREN | WS_CAPTION // | WS_MAXIMIZEBOX
 
 // Global variables and strings.
+float				magFactor = 2.0f;
 HINSTANCE           hInst;
 const TCHAR         WindowClassName[]= TEXT("MagnifierWindow");
 const TCHAR         WindowTitle[]= TEXT("LOCKED. To unlock magnifier: ALT-TAB to window, press ESC 1 or 2 times");
-const TCHAR			WindowTitleMoveable[] = TEXT("UNLOCKED. To lock magnifier: click window, press ESC");
+const TCHAR			WindowTitleMoveable[] = TEXT("UNLOCKED. To lock magnifier: click window, press ESC 1 or 2 times");
 const UINT          timerInterval = 16; // close to the refresh rate @60hz
 HWND                hwndMag;
 HWND                hwndHost;
@@ -63,7 +62,7 @@ BOOL                SetupMagnifier(HINSTANCE hinst);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 void CALLBACK       UpdateMagWindow(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
 void SetupToolbarWindow(HINSTANCE hInstance);
-BOOL                isMouseTransparent = FALSE;
+BOOL                isMouseTransparent = TRUE;
 bool updateMagColors(float rf, float gf, float bf, float ro, float bo, float go);
 
 //
@@ -111,6 +110,17 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance,
     KillTimer(NULL, timerId);
     MagUninitialize();
     return (int) msg.wParam;
+}
+
+MAGTRANSFORM updateMagFactor(float mf) {
+	magFactor = mf;
+	// Set the magnification factor.
+	MAGTRANSFORM matrix;
+	memset(&matrix, 0, sizeof(matrix));
+	matrix.v[0][0] = magFactor;
+	matrix.v[1][1] = magFactor;
+	matrix.v[2][2] = 1.0f;
+	return matrix;
 }
 
 
@@ -174,12 +184,20 @@ LRESULT CALLBACK ToolbarWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 	char *buf;
 	float colors[6];
 	int ids[] = { ID_RED_MULT, ID_GREEN_MULT, ID_BLUE_MULT, ID_RED_OFFSET, ID_GREEN_OFFSET, ID_BLUE_OFFSET };
+	DWORD dwPos;    // current position of slider 
 
 	switch (message)
 	{
 
 	case WM_DESTROY:
 		PostQuitMessage(0);
+		break;
+
+	case WM_HSCROLL:
+		if (LOWORD(wParam) == TB_ENDTRACK) {
+			dwPos = SendMessage(GetDlgItem(hWnd, ID_ZOOM_SLIDER), TBM_GETPOS, 0, 0);
+			MagSetWindowTransform(hwndMag, &updateMagFactor((float) dwPos / 2));
+		}
 		break;
 
 	case WM_COMMAND:
@@ -247,7 +265,7 @@ void SetupToolbarWindow(HINSTANCE hInstance)
 		"toolbar",
 		"Toolbar",
 		RESTOREDWINDOWSTYLES,
-		0, 0, 120, GetSystemMetrics(SM_CYSCREEN),
+		50, GetSystemMetrics(SM_CYSCREEN) - 450, 120, 300, //GetSystemMetrics(SM_CYSCREEN),
 		NULL, NULL, hInstance, NULL
 	);
 
@@ -274,8 +292,20 @@ void SetupToolbarWindow(HINSTANCE hInstance)
 	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "1", WS_CHILD | WS_VISIBLE,
 		60, 145, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_BLUE_OFFSET, GetModuleHandle(NULL), NULL);
 
-	CreateWindowEx(0, TRACKBAR_CLASS, "Zoom", WS_CHILD | WS_VISIBLE,	
+	HWND hwndZoom = CreateWindowEx(0, TRACKBAR_CLASS, "Zoom", WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS,
 		5, 185, 100, 30, hwndFilter, (HMENU)ID_ZOOM_SLIDER, GetModuleHandle(NULL), NULL);
+	SendMessage(
+		hwndZoom,
+		TBM_SETRANGE,
+		(WPARAM)TRUE,                   // redraw flag 
+		(LPARAM)MAKELONG(2, 8)  // min. & max. positions
+	);
+	SendMessage(
+		hwndZoom,
+		TBM_SETPOS,
+		(WPARAM)TRUE,
+		(LPARAM)4 // 200% zoom
+	);
 	
 }
 
@@ -305,14 +335,14 @@ BOOL SetupMagnifier(HINSTANCE hinst)
 {
     // Set bounds of host window according to screen size.
     hostWindowRect.top = GetSystemMetrics(SM_CYSCREEN) / 3;
-    hostWindowRect.bottom = GetSystemMetrics(SM_CYSCREEN) / 2;  // quarter of screen
-    hostWindowRect.left = 100;
-    hostWindowRect.right = GetSystemMetrics(SM_CXSCREEN) / 2;
+    hostWindowRect.bottom = GetSystemMetrics(SM_CYSCREEN) / 3;  // ninth of screen
+    hostWindowRect.left = 200;
+    hostWindowRect.right = GetSystemMetrics(SM_CXSCREEN) / 3;
 
     // Create the host window.
     RegisterHostWindowClass(hinst);
-    hwndHost = CreateWindowEx(WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_LAYERED,
-        WindowClassName, WindowTitle, 
+    hwndHost = CreateWindowEx(WS_EX_TOPMOST | WS_EX_LAYERED,
+        WindowClassName, WindowTitleMoveable, 
         RESTOREDWINDOWSTYLES,
         hostWindowRect.left, hostWindowRect.top, hostWindowRect.right, hostWindowRect.bottom, NULL, NULL, hInst, NULL);
     if (!hwndHost)
@@ -333,12 +363,7 @@ BOOL SetupMagnifier(HINSTANCE hinst)
         return FALSE;
     }
 
-    // Set the magnification factor.
-    MAGTRANSFORM matrix;
-    memset(&matrix, 0, sizeof(matrix));
-    matrix.v[0][0] = MAGFACTOR;
-    matrix.v[1][1] = MAGFACTOR;
-    matrix.v[2][2] = 1.0f;
+	MAGTRANSFORM matrix = updateMagFactor(magFactor);
 
     BOOL ret = MagSetWindowTransform(hwndMag, &matrix);
 
@@ -352,21 +377,6 @@ BOOL SetupMagnifier(HINSTANCE hinst)
 			{ 0.0f,  0.0f,  0.0f,  1.0f,  0.0f },
 			{ 1.0f,  1.0f,  1.0f,  0.0f,  1.0f }
 		}};
-		//{{ // Normal
-		//	{ 1.0f, 0.0f,  0.0f,  0.0f,  0.0f },
-		//	{ 0.0f, 1.0f,  0.0f,  0.0f,  0.0f },
-		//	{ 0.0f,  0.0f, 1.0f,  0.0f,  0.0f },
-		//	{ 0.0f,  0.0f,  0.0f,  1.0f,  0.0f },
-		//	{ 0.0f,  0.0f,  0.0f,  0.0f,  0.0f }
-		//}};
-		/*{{ // Custom
-			{ 2.0f, 0.0f,  0.0f,  0.0f,  0.0f },
-			{ 0.0f, 2.0f,  0.0f,  0.0f,  0.0f },
-			{ 0.0f,  0.0f, 1.0f,  0.0f,  0.0f },
-			{ 0.0f,  0.0f,  0.0f,  1.0f,  0.0f },
-			{ -1.0f,  -1.0f,  0.0f,  0.0f,  0.0f }
-		}};*/
-		
 
         ret = MagSetColorEffect(hwndMag,&magEffectInvert);
     }
@@ -385,24 +395,37 @@ void CALLBACK UpdateMagWindow(HWND /*hwnd*/, UINT /*uMsg*/, UINT_PTR /*idEvent*/
     POINT mousePoint;
     GetCursorPos(&mousePoint);
 
-    int width = (int)((magWindowRect.right - magWindowRect.left) / MAGFACTOR);
-    int height = (int)((magWindowRect.bottom - magWindowRect.top) / MAGFACTOR);
-
 	// Screen metrics
 	long screenY = GetSystemMetrics(SM_CYSCREEN);
 	long screenX = GetSystemMetrics(SM_CXSCREEN);
 
     RECT sourceRect;
 	RECT windowRect;
+	RECT magWindowRectRelToScreen;
+
 	GetWindowRect(hwndHost, &windowRect);
-	sourceRect.left = (long) (10 + windowRect.left + (width) * (windowRect.left) / (screenX - MAGFACTOR * width));
-	// ^ original: mousePoint.x - width / 2;
-    sourceRect.top = (long) (windowRect.top + (height) * (windowRect.top) / (screenY - MAGFACTOR * height));
-	// ^ original: mousePoint.y -  height / 2;
+	GetWindowRect(hwndMag, &magWindowRectRelToScreen);
+
+	int srcWidth = (int)((magWindowRect.right - magWindowRect.left) / magFactor);
+	int srcHeight = (int)((magWindowRect.bottom - magWindowRect.top) / magFactor);
+	int width = (int)(magWindowRectRelToScreen.right - magWindowRectRelToScreen.left);
+	int height = (int)(magWindowRectRelToScreen.bottom - magWindowRectRelToScreen.top);
 
 
-    sourceRect.right = sourceRect.left + width;
-    sourceRect.bottom = sourceRect.top + height;
+	sourceRect.left = (long) (magWindowRectRelToScreen.left 
+		+ (width - srcWidth) * magWindowRectRelToScreen.left
+		/ (screenX - width));
+    sourceRect.top = (long) (windowRect.top
+		+ (height - srcHeight) * windowRect.top
+		/ (screenY - height));
+
+
+	// ^ original: mousePoint.x - srcWidth / 2;
+	// ^ original: mousePoint.y -  srcHeight / 2;
+
+
+    sourceRect.right = sourceRect.left + srcWidth;
+    sourceRect.bottom = sourceRect.top + srcHeight;
 
     // Set the source rectangle for the magnifier control.
     MagSetWindowSource(hwndMag, sourceRect);
