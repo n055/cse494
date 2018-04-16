@@ -15,14 +15,12 @@
 * The sample is not designed for multimonitor setups.
 *************************************************************************************************/
 
+#include "stdafx.h"
+
 // Ensure that the following definition is in effect before winuser.h is included.
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0501    
 #endif
-
-#include <windows.h>
-#include <wincodec.h>
-#include <magnification.h>
 
 // For simplicity, the sample uses a constant magnification factor.
 #define MAGFACTOR  2.0f
@@ -40,6 +38,24 @@ HINSTANCE			filterInst;
 HWND				hwndFilter;
 RECT                magWindowRect;
 RECT                hostWindowRect;
+
+// Toolbar GUI controls
+#define ID_RED_TEXT		101
+#define ID_RED_MULT		102
+#define ID_RED_OFFSET	103
+
+#define ID_GREEN_TEXT	111
+#define ID_GREEN_MULT	112
+#define ID_GREEN_OFFSET	113
+
+#define ID_BLUE_TEXT	121
+#define ID_BLUE_MULT	122
+#define ID_BLUE_OFFSET	123
+
+#define ID_ZOOM_SLIDER	131
+
+#define INPUT_Y 23
+#define INPUT_X 50
 
 // Forward declarations.
 ATOM                RegisterHostWindowClass(HINSTANCE hInstance);
@@ -184,7 +200,7 @@ void SetupToolbarWindow(HINSTANCE hInstance)
 	RegisterClassEx(&wcex);
 
 	hwndFilter = CreateWindowEx(
-		0,
+		WS_EX_CLIENTEDGE,
 		"toolbar",
 		"Toolbar",
 		RESTOREDWINDOWSTYLES,
@@ -192,12 +208,41 @@ void SetupToolbarWindow(HINSTANCE hInstance)
 		NULL, NULL, hInstance, NULL
 	);
 
-	// Toolbar GUI controls
-	#define ID_RED_MULT	101
+	// Create Toolbar GUI controls
 
-	/*HWND hRedMult = */CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE | ES_NUMBER,
-		0, 0, 100, 28, hwndFilter, (HMENU)ID_RED_MULT, GetModuleHandle(NULL), NULL);
+	CreateWindowEx(0, "STATIC", "R Factor/Offset", WS_CHILD | WS_VISIBLE | SS_LEFT,
+		5, 5, INPUT_X * 3, 15, hwndFilter, (HMENU)ID_RED_TEXT, GetModuleHandle(NULL), NULL);
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE,
+		5, 25, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_RED_MULT, GetModuleHandle(NULL), NULL);
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE,
+		60, 25, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_RED_OFFSET, GetModuleHandle(NULL), NULL);
+
+	CreateWindowEx(0, "STATIC", "G Factor/Offset", WS_CHILD | WS_VISIBLE | SS_LEFT,
+		5, 65, INPUT_X * 3, 15, hwndFilter, (HMENU)ID_GREEN_TEXT, GetModuleHandle(NULL), NULL);
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE,
+		5, 85, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_GREEN_MULT, GetModuleHandle(NULL), NULL);
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE,
+		60, 85, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_GREEN_OFFSET, GetModuleHandle(NULL), NULL);
+
+	CreateWindowEx(0, "STATIC", "B Factor/Offset", WS_CHILD | WS_VISIBLE | SS_LEFT,
+		5, 125, INPUT_X * 3, 15, hwndFilter, (HMENU)ID_BLUE_TEXT, GetModuleHandle(NULL), NULL);
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE,
+		5, 145, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_BLUE_MULT, GetModuleHandle(NULL), NULL);
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE,
+		60, 145, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_BLUE_OFFSET, GetModuleHandle(NULL), NULL);
+
+	CreateWindowEx(0, TRACKBAR_CLASS, "Zoom", WS_CHILD | WS_VISIBLE,	
+		5, 185, 100, 30, hwndFilter, (HMENU)ID_ZOOM_SLIDER, GetModuleHandle(NULL), NULL);
 	
+}
+
+//
+// FUNCTION: updateMagColors
+//
+// PURPOSE: Changes the colors of the magnifier
+//
+void updateMagColors(int rf, int gf, int bf, int ro, int bo, int go) {
+
 }
 
 //
