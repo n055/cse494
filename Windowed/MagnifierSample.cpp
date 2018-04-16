@@ -64,6 +64,7 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 void CALLBACK       UpdateMagWindow(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
 void SetupToolbarWindow(HINSTANCE hInstance);
 BOOL                isMouseTransparent = FALSE;
+bool updateMagColors(float rf, float gf, float bf, float ro, float bo, float go);
 
 //
 // FUNCTION: WinMain()
@@ -163,6 +164,48 @@ LRESULT CALLBACK HostWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
 }
 
 //
+// FUNCTION: ToolbarWndProc()
+//
+// PURPOSE: Window procedure for the window that hosts the toolbar control.
+//
+LRESULT CALLBACK ToolbarWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	int len, idx;
+	char *buf;
+	float colors[6];
+	int ids[] = { ID_RED_MULT, ID_GREEN_MULT, ID_BLUE_MULT, ID_RED_OFFSET, ID_GREEN_OFFSET, ID_BLUE_OFFSET };
+
+	switch (message)
+	{
+
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		break;
+
+	case WM_COMMAND:
+		if (HIWORD(wParam) != EN_CHANGE) {
+			break;
+		}
+		for (idx = 0; idx < 6; idx++) {
+			len = GetWindowTextLength(GetDlgItem(hWnd, ids[idx])) + 1;
+			buf = new char[len];
+			GetDlgItemText(hWnd, ids[idx], buf, len);
+			colors[idx] = (float) atof(buf);
+			delete buf;
+		}
+
+		updateMagColors(
+			colors[0], colors[1], colors[2], colors[3], colors[4], colors[5]
+		);
+		break;
+
+	default:
+		return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+	return 0;
+}
+
+//
 //  FUNCTION: RegisterHostWindowClass()
 //
 //  PURPOSE: Registers the window class for the window that contains the magnification control.
@@ -192,7 +235,7 @@ void SetupToolbarWindow(HINSTANCE hInstance)
 	WNDCLASSEX wcex = {};
 	wcex.cbSize = sizeof(WNDCLASSEX);
 	wcex.style = CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc = DefWindowProc;
+	wcex.lpfnWndProc = ToolbarWndProc;
 	wcex.hInstance = hInstance;
 	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wcex.hbrBackground = (HBRUSH)(1 + COLOR_BTNFACE);
@@ -212,23 +255,23 @@ void SetupToolbarWindow(HINSTANCE hInstance)
 
 	CreateWindowEx(0, "STATIC", "R Factor/Offset", WS_CHILD | WS_VISIBLE | SS_LEFT,
 		5, 5, INPUT_X * 3, 15, hwndFilter, (HMENU)ID_RED_TEXT, GetModuleHandle(NULL), NULL);
-	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE,
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "-1", WS_CHILD | WS_VISIBLE,
 		5, 25, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_RED_MULT, GetModuleHandle(NULL), NULL);
-	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE,
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "1", WS_CHILD | WS_VISIBLE,
 		60, 25, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_RED_OFFSET, GetModuleHandle(NULL), NULL);
 
 	CreateWindowEx(0, "STATIC", "G Factor/Offset", WS_CHILD | WS_VISIBLE | SS_LEFT,
 		5, 65, INPUT_X * 3, 15, hwndFilter, (HMENU)ID_GREEN_TEXT, GetModuleHandle(NULL), NULL);
-	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE,
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "-1", WS_CHILD | WS_VISIBLE,
 		5, 85, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_GREEN_MULT, GetModuleHandle(NULL), NULL);
-	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE,
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "1", WS_CHILD | WS_VISIBLE,
 		60, 85, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_GREEN_OFFSET, GetModuleHandle(NULL), NULL);
 
 	CreateWindowEx(0, "STATIC", "B Factor/Offset", WS_CHILD | WS_VISIBLE | SS_LEFT,
 		5, 125, INPUT_X * 3, 15, hwndFilter, (HMENU)ID_BLUE_TEXT, GetModuleHandle(NULL), NULL);
-	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE,
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "-1", WS_CHILD | WS_VISIBLE,
 		5, 145, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_BLUE_MULT, GetModuleHandle(NULL), NULL);
-	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE,
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "1", WS_CHILD | WS_VISIBLE,
 		60, 145, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_BLUE_OFFSET, GetModuleHandle(NULL), NULL);
 
 	CreateWindowEx(0, TRACKBAR_CLASS, "Zoom", WS_CHILD | WS_VISIBLE,	
@@ -241,8 +284,16 @@ void SetupToolbarWindow(HINSTANCE hInstance)
 //
 // PURPOSE: Changes the colors of the magnifier
 //
-void updateMagColors(int rf, int gf, int bf, int ro, int bo, int go) {
-
+bool updateMagColors(float rf, float gf, float bf, float ro, float bo, float go) {
+	MAGCOLOREFFECT magEffectInvert =
+	{ {
+		{ rf, 0.0f, 0.0f, 0.0f, 0.0f },
+		{ 0.0f, gf,  0.0f,  0.0f,  0.0f },
+		{ 0.0f,  0.0f, bf,  0.0f,  0.0f },
+		{ 0.0f,  0.0f,  0.0f,  1.0f,  0.0f },
+		{ ro,  bo,  go,  0.0f,  1.0f }
+	} };
+	return MagSetColorEffect(hwndMag, &magEffectInvert);
 }
 
 //
