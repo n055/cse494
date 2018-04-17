@@ -384,7 +384,7 @@ void SetupToolbarWindow(HINSTANCE hInstance)
 	RegisterClassEx(&wcex);
 
 	hwndFilter = CreateWindowEx(
-		WS_EX_CLIENTEDGE,
+		WS_EX_TOPMOST | WS_EX_CLIENTEDGE,
 		"toolbar",
 		"Toolbar",
 		RESTOREDWINDOWSTYLES,
