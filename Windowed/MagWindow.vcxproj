@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{B6D10B95-F91C-4286-8751-35FF71CBD30E}</ProjectGuid>
+    <ProjectGuid>{C0961F33-4D34-4CC3-B20D-7C403C4ABCDD}</ProjectGuid>
     <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -129,12 +129,20 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\Toolbar\Toolbar.cpp" />
-    <ClCompile Include="MagnifierSample.cpp">
+    <ClCompile Include="MagWindow.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="resource1.h" />
     <ClInclude Include="stdafx.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="MagWindow.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="ico281.ico" />
+    <Image Include="icon1.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

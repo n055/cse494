@@ -16,20 +16,21 @@
 *************************************************************************************************/
 
 #include "stdafx.h"
+#include "resource1.h"
 
 // Ensure that the following definition is in effect before winuser.h is included.
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0501    
 #endif
 
-#define RESTOREDWINDOWSTYLES WS_SIZEBOX | WS_SYSMENU | WS_CLIPCHILDREN | WS_CAPTION // | WS_MAXIMIZEBOX
+#define RESTOREDWINDOWSTYLES WS_SIZEBOX | WS_SYSMENU | WS_CLIPCHILDREN | WS_CAPTION
 
 // Global variables and strings.
 float				magFactor = 2.0f;
 HINSTANCE           hInst;
 const TCHAR         WindowClassName[]= TEXT("MagnifierWindow");
-const TCHAR         WindowTitle[]= TEXT("LOCKED. To unlock magnifier: ALT-TAB to window, press ESC 1 or 2 times");
-const TCHAR			WindowTitleMoveable[] = TEXT("UNLOCKED. To lock magnifier: click window, press ESC 1 or 2 times");
+const TCHAR         WindowTitle[]= TEXT("LOCKED. To unlock magnifier: ALT-TAB to window, press ESC");
+const TCHAR			WindowTitleMoveable[] = TEXT("UNLOCKED. To lock magnifier: click window, press ESC");
 const UINT          timerInterval = 16; // close to the refresh rate @60hz
 HWND                hwndMag;
 HWND                hwndHost;
@@ -37,6 +38,7 @@ HINSTANCE			filterInst;
 HWND				hwndFilter;
 RECT                magWindowRect;
 RECT                hostWindowRect;
+HWND hDlgCurrent = NULL;
 
 // Toolbar GUI controls
 #define ID_RED_TEXT		101
@@ -53,8 +55,22 @@ RECT                hostWindowRect;
 
 #define ID_ZOOM_SLIDER	131
 
+#define ID_LOCK 141
+
+#define ID_LOAD 151
+
+#define ID_MENU 161
+
 #define INPUT_Y 23
 #define INPUT_X 50
+
+// User-defined presets
+struct preset {
+	std::string name = "";
+	float rf = 1, gf = 1, bf = 1, ro = 0, go = 0, bo = 0, zoom = 2;
+};
+std::vector<preset> presets;
+
 
 // Forward declarations.
 ATOM                RegisterHostWindowClass(HINSTANCE hInstance);
@@ -62,8 +78,9 @@ BOOL                SetupMagnifier(HINSTANCE hinst);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 void CALLBACK       UpdateMagWindow(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime);
 void SetupToolbarWindow(HINSTANCE hInstance);
-BOOL                isMouseTransparent = TRUE;
+BOOL                isMouseTransparent = FALSE;
 bool updateMagColors(float rf, float gf, float bf, float ro, float bo, float go);
+void loadSettings(char filename[MAX_PATH]);
 
 //
 // FUNCTION: WinMain()
@@ -102,8 +119,11 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance,
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0))
     {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+		if (NULL == hDlgCurrent || !IsDialogMessage(hDlgCurrent, &msg))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
     }
 
     // Shut down.
@@ -123,6 +143,21 @@ MAGTRANSFORM updateMagFactor(float mf) {
 	return matrix;
 }
 
+void toggleLock() {
+	if (isMouseTransparent)
+	{
+		SetWindowLongPtr(hwndHost, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_LAYERED);
+		SetWindowText(hwndHost, WindowTitleMoveable);
+		CheckDlgButton(hwndFilter, ID_LOCK, BST_UNCHECKED);
+	}
+	else {
+		SetWindowLongPtr(hwndHost, GWL_EXSTYLE, WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_LAYERED);
+		SetWindowText(hwndHost, WindowTitle);
+		CheckDlgButton(hwndFilter, ID_LOCK, BST_CHECKED);
+	}
+	isMouseTransparent = !isMouseTransparent;
+}
+
 
 //
 // FUNCTION: HostWndProc()
@@ -140,16 +175,7 @@ LRESULT CALLBACK HostWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
     case WM_KEYDOWN:
         if (wParam == VK_ESCAPE)
         {
-            if (isMouseTransparent) 
-            {
-				SetWindowLongPtr(hWnd, GWL_EXSTYLE, WS_EX_TOPMOST | WS_EX_LAYERED);
-				SetWindowText(hWnd, WindowTitleMoveable);
-			}
-			else {
-				SetWindowLongPtr(hWnd, GWL_EXSTYLE, WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_LAYERED);
-				SetWindowText(hWnd, WindowTitle);
-			}
-			isMouseTransparent = !isMouseTransparent;
+			toggleLock();
         }
         break;
 
@@ -173,6 +199,15 @@ LRESULT CALLBACK HostWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
     return 0;  
 }
 
+void changeMag(HWND hWnd, WPARAM wParam) {
+	if (LOWORD(wParam) == TB_ENDTRACK) {
+		DWORD dwPos;    // current position of slider 
+		dwPos = (DWORD)SendMessage(GetDlgItem(hWnd, ID_ZOOM_SLIDER), TBM_GETPOS, 0, 0);
+		MAGTRANSFORM mf = updateMagFactor((float)dwPos / 2);
+		MagSetWindowTransform(hwndMag, &mf);
+	}
+}
+
 //
 // FUNCTION: ToolbarWndProc()
 //
@@ -184,37 +219,79 @@ LRESULT CALLBACK ToolbarWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 	char *buf;
 	float colors[6];
 	int ids[] = { ID_RED_MULT, ID_GREEN_MULT, ID_BLUE_MULT, ID_RED_OFFSET, ID_GREEN_OFFSET, ID_BLUE_OFFSET };
-	DWORD dwPos;    // current position of slider 
 
 	switch (message)
 	{
+	case WM_ACTIVATE:
+		if (0 == wParam)             // becoming inactive
+			hDlgCurrent = NULL;
+		else                         // becoming active
+			hDlgCurrent = hWnd;
 
+		return FALSE;
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
 
 	case WM_HSCROLL:
-		if (LOWORD(wParam) == TB_ENDTRACK) {
-			dwPos = SendMessage(GetDlgItem(hWnd, ID_ZOOM_SLIDER), TBM_GETPOS, 0, 0);
-			MagSetWindowTransform(hwndMag, &updateMagFactor((float) dwPos / 2));
-		}
+		changeMag(hWnd, wParam);
 		break;
 
 	case WM_COMMAND:
-		if (HIWORD(wParam) != EN_CHANGE) {
-			break;
+		if (LOWORD(wParam) == ID_LOCK) {
+			toggleLock();
 		}
-		for (idx = 0; idx < 6; idx++) {
-			len = GetWindowTextLength(GetDlgItem(hWnd, ids[idx])) + 1;
-			buf = new char[len];
-			GetDlgItemText(hWnd, ids[idx], buf, len);
-			colors[idx] = (float) atof(buf);
-			delete buf;
+		else if (LOWORD(wParam) == ID_LOAD) {
+			OPENFILENAME ofn;
+			char szFileName[MAX_PATH] = "";
+
+			ZeroMemory(&ofn, sizeof(ofn));
+
+			ofn.lStructSize = sizeof(ofn); // SEE NOTE BELOW
+			ofn.hwndOwner = hWnd;
+			ofn.lpstrFilter = "Text Files (*.txt)\0*.txt\0All Files (*.*)\0*.*\0";
+			ofn.lpstrFile = szFileName;
+			ofn.nMaxFile = MAX_PATH;
+			ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
+			ofn.lpstrDefExt = "txt";
+
+			if (GetOpenFileName(&ofn))
+			{
+				loadSettings(szFileName);
+				// Do something usefull with the filename stored in szFileName 
+			}
+		}
+		else if (HIWORD(wParam) == CBN_SELCHANGE) {
+			preset p = presets[SendMessage(GetDlgItem(hwndFilter, ID_MENU), CB_GETCURSEL, 0, 0)];
+			// Retrieve data from given preset p
+			SendMessage(GetDlgItem(hwndFilter, ID_RED_MULT), WM_SETTEXT, 0, (LPARAM)std::to_string(p.rf).substr(0, 5).c_str());
+			SendMessage(GetDlgItem(hwndFilter, ID_RED_OFFSET), WM_SETTEXT, 0, (LPARAM)std::to_string(p.ro).substr(0, 5).c_str());
+			SendMessage(GetDlgItem(hwndFilter, ID_GREEN_MULT), WM_SETTEXT, 0, (LPARAM)std::to_string(p.gf).substr(0, 5).c_str());
+			SendMessage(GetDlgItem(hwndFilter, ID_GREEN_OFFSET), WM_SETTEXT, 0, (LPARAM)std::to_string(p.go).substr(0, 5).c_str());
+			SendMessage(GetDlgItem(hwndFilter, ID_BLUE_MULT), WM_SETTEXT, 0, (LPARAM)std::to_string(p.bf).substr(0, 5).c_str());
+			SendMessage(GetDlgItem(hwndFilter, ID_BLUE_OFFSET), WM_SETTEXT, 0, (LPARAM)std::to_string(p.bo).substr(0, 5).c_str());
+			SendMessage(
+				GetDlgItem(hwndFilter, ID_ZOOM_SLIDER),
+				TBM_SETPOS,
+				(WPARAM)TRUE,
+				(LPARAM)(p.zoom * 2.0f)
+			);
+			changeMag(hWnd, TB_ENDTRACK);
+			
+		} else if (HIWORD(wParam) == EN_CHANGE) {
+			for (idx = 0; idx < 6; idx++) {
+				len = GetWindowTextLength(GetDlgItem(hWnd, ids[idx])) + 1;
+				buf = new char[len];
+				GetDlgItemText(hWnd, ids[idx], buf, len);
+				colors[idx] = (float) atof(buf);
+				delete buf;
+			}
+
+			updateMagColors(
+				colors[0], colors[1], colors[2], colors[3], colors[4], colors[5]
+			);
 		}
 
-		updateMagColors(
-			colors[0], colors[1], colors[2], colors[3], colors[4], colors[5]
-		);
 		break;
 
 	default:
@@ -239,8 +316,51 @@ ATOM RegisterHostWindowClass(HINSTANCE hInstance)
     wcex.hCursor        = LoadCursor(NULL, IDC_ARROW);
     wcex.hbrBackground  = (HBRUSH)(1 + COLOR_BTNFACE);
     wcex.lpszClassName  = WindowClassName;
+	wcex.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1));
+	wcex.hIconSm = (HICON)LoadImage(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1), IMAGE_ICON, ::GetSystemMetrics(SM_CXICON),
+		::GetSystemMetrics(SM_CYICON), 0);
 
     return RegisterClassEx(&wcex);
+}
+
+void loadSettings(char filename[MAX_PATH]) {
+	std::ifstream settings;
+	settings.open(filename); //TODO fix
+	if (settings) {
+
+		std::string line;
+		// iterate over lines of settings
+		while (std::getline(settings, line, '\n')) {
+			preset p;
+			std::istringstream iss(line);
+			std::string token;
+			std::getline(iss, token, ',');
+			p.name = token;
+			std::getline(iss, token, ',');
+			p.rf = stof(token);
+			std::getline(iss, token, ',');
+			p.gf = stof(token);
+			std::getline(iss, token, ',');
+			p.bf = stof(token);
+			std::getline(iss, token, ',');
+			p.ro = stof(token);
+			std::getline(iss, token, ',');
+			p.go = stof(token);
+			std::getline(iss, token, ',');
+			p.bo = stof(token);
+			std::getline(iss, token, ',');
+			p.zoom = stof(token);
+			presets.push_back(p);
+		}
+	}
+	settings.close();
+
+	// Populate dropdown menu
+	for each (preset p in presets)
+	{
+		LPCSTR name = p.name.c_str();
+		SendMessage(GetDlgItem(hwndFilter, ID_MENU), CB_ADDSTRING, (WPARAM)0, (LPARAM)name);
+	}
 }
 
 //
@@ -258,6 +378,9 @@ void SetupToolbarWindow(HINSTANCE hInstance)
 	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wcex.hbrBackground = (HBRUSH)(1 + COLOR_BTNFACE);
 	wcex.lpszClassName = TEXT("toolbar");
+	wcex.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1));
+	wcex.hIconSm = (HICON)LoadImage(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1), IMAGE_ICON, ::GetSystemMetrics(SM_CXICON),
+		::GetSystemMetrics(SM_CYICON), 0);
 	RegisterClassEx(&wcex);
 
 	hwndFilter = CreateWindowEx(
@@ -265,7 +388,7 @@ void SetupToolbarWindow(HINSTANCE hInstance)
 		"toolbar",
 		"Toolbar",
 		RESTOREDWINDOWSTYLES,
-		50, GetSystemMetrics(SM_CYSCREEN) - 450, 120, 300, //GetSystemMetrics(SM_CYSCREEN),
+		50, GetSystemMetrics(SM_CYSCREEN) - 450, 120, 360, //GetSystemMetrics(SM_CYSCREEN),
 		NULL, NULL, hInstance, NULL
 	);
 
@@ -273,27 +396,27 @@ void SetupToolbarWindow(HINSTANCE hInstance)
 
 	CreateWindowEx(0, "STATIC", "R Factor/Offset", WS_CHILD | WS_VISIBLE | SS_LEFT,
 		5, 5, INPUT_X * 3, 15, hwndFilter, (HMENU)ID_RED_TEXT, GetModuleHandle(NULL), NULL);
-	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "-1", WS_CHILD | WS_VISIBLE,
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "1", WS_TABSTOP | WS_CHILD | WS_VISIBLE,
 		5, 25, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_RED_MULT, GetModuleHandle(NULL), NULL);
-	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "1", WS_CHILD | WS_VISIBLE,
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "0", WS_TABSTOP | WS_CHILD | WS_VISIBLE,
 		60, 25, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_RED_OFFSET, GetModuleHandle(NULL), NULL);
 
 	CreateWindowEx(0, "STATIC", "G Factor/Offset", WS_CHILD | WS_VISIBLE | SS_LEFT,
 		5, 65, INPUT_X * 3, 15, hwndFilter, (HMENU)ID_GREEN_TEXT, GetModuleHandle(NULL), NULL);
-	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "-1", WS_CHILD | WS_VISIBLE,
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "1", WS_TABSTOP | WS_CHILD | WS_VISIBLE,
 		5, 85, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_GREEN_MULT, GetModuleHandle(NULL), NULL);
-	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "1", WS_CHILD | WS_VISIBLE,
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "0", WS_TABSTOP | WS_CHILD | WS_VISIBLE,
 		60, 85, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_GREEN_OFFSET, GetModuleHandle(NULL), NULL);
 
 	CreateWindowEx(0, "STATIC", "B Factor/Offset", WS_CHILD | WS_VISIBLE | SS_LEFT,
 		5, 125, INPUT_X * 3, 15, hwndFilter, (HMENU)ID_BLUE_TEXT, GetModuleHandle(NULL), NULL);
-	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "-1", WS_CHILD | WS_VISIBLE,
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "1", WS_TABSTOP | WS_CHILD | WS_VISIBLE,
 		5, 145, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_BLUE_MULT, GetModuleHandle(NULL), NULL);
-	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "1", WS_CHILD | WS_VISIBLE,
+	CreateWindowEx(WS_EX_CLIENTEDGE, "EDIT", "0", WS_TABSTOP | WS_CHILD | WS_VISIBLE,
 		60, 145, INPUT_X, INPUT_Y, hwndFilter, (HMENU)ID_BLUE_OFFSET, GetModuleHandle(NULL), NULL);
 
-	HWND hwndZoom = CreateWindowEx(0, TRACKBAR_CLASS, "Zoom", WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS,
-		5, 185, 100, 30, hwndFilter, (HMENU)ID_ZOOM_SLIDER, GetModuleHandle(NULL), NULL);
+	HWND hwndZoom = CreateWindowEx(0, TRACKBAR_CLASS, "Zoom", WS_TABSTOP | WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS,
+		5, 185, 105, 30, hwndFilter, (HMENU)ID_ZOOM_SLIDER, GetModuleHandle(NULL), NULL);
 	SendMessage(
 		hwndZoom,
 		TBM_SETRANGE,
@@ -306,6 +429,15 @@ void SetupToolbarWindow(HINSTANCE hInstance)
 		(WPARAM)TRUE,
 		(LPARAM)4 // 200% zoom
 	);
+
+	CreateWindowEx(0, "BUTTON", "Lock Window", WS_TABSTOP | WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
+		5, 225, 110, INPUT_Y, hwndFilter, (HMENU)ID_LOCK, GetModuleHandle(NULL), NULL);
+
+	CreateWindowEx(0, "BUTTON", "Load Presets", WS_TABSTOP | WS_CHILD | WS_VISIBLE,
+		5, 255, 105, INPUT_Y, hwndFilter, (HMENU)ID_LOAD, GetModuleHandle(NULL), NULL);
+
+	CreateWindowEx(0, WC_COMBOBOX, "(Presets)", WS_TABSTOP | CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_VISIBLE,
+		5, 285, 105, INPUT_Y, hwndFilter, (HMENU)ID_MENU, GetModuleHandle(NULL), NULL);
 	
 }
 
@@ -369,16 +501,7 @@ BOOL SetupMagnifier(HINSTANCE hinst)
 
     if (ret)
     {
-        MAGCOLOREFFECT magEffectInvert = 
-    	{{ // MagEffectInvert
-			{ -1.0f, 0.0f, 0.0f, 0.0f, 0.0f },
-			{ 0.0f, -1.0f,  0.0f,  0.0f,  0.0f },
-			{ 0.0f,  0.0f, -1.0f,  0.0f,  0.0f },
-			{ 0.0f,  0.0f,  0.0f,  1.0f,  0.0f },
-			{ 1.0f,  1.0f,  1.0f,  0.0f,  1.0f }
-		}};
-
-        ret = MagSetColorEffect(hwndMag,&magEffectInvert);
+		return updateMagColors(1, 1, 1, 0, 0, 0);
     }
 
     return ret;  
