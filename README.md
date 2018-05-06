@@ -34,6 +34,6 @@ Users may load a text file containing preset color and zoom values. The format i
 
 Meaning of each comma-delimited column of the settings file:
 
-`Preset Name (Text, cannot contain comma), Red Factor (Number), Green Factor (Number), Blue Factor (Number), Red Offset (Number), Green Offset (Number), Blue Offset (Number)`
+`Preset Name (Text, cannot contain comma), Red Factor (Number), Green Factor (Number), Blue Factor (Number), Red Offset (Number), Green Offset (Number), Blue Offset (Number), Zoom Multiplier (Number)`
 
 After the user loads a preset file, the dropdown menu at the bottom of the toolbar is populated with the presets.
